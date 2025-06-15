@@ -12,7 +12,7 @@ let folderKey;
 // --- Helper Functions ---
 const saveSettings = () => {
   browser.storage.sync.set({
-    batchSize: parseInt(batchSizeInput.value, 10) || 50,
+    batchSize: parseInt(batchSizeInput.value, 10) || 5,
     includeFolders: includeFoldersInput.checked,
   });
 };
@@ -25,7 +25,6 @@ const disableButtons = (isDisbled) => {
 
 // --- Main Logic ---
 
-// Function to update the status display
 const updateStatus = async () => {
   if (!folderKey) return;
   const data = await browser.storage.local.get(folderKey);
@@ -46,9 +45,7 @@ const updateStatus = async () => {
   }
 };
 
-// Initializes the popup, gets tab info, and updates status
 document.addEventListener("DOMContentLoaded", async () => {
-  // Load saved settings
   const settings = await browser.storage.sync.get([
     "batchSize",
     "includeFolders",
@@ -56,7 +53,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   batchSizeInput.value = settings.batchSize || 50;
   includeFoldersInput.checked = settings.includeFolders === true;
 
-  // Get current tab info
   [currentTab] = await browser.tabs.query({
     active: true,
     currentWindow: true,
@@ -68,11 +64,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     return;
   }
 
-  // Create a unique key for the current folder
   const url = new URL(currentTab.url);
   folderKey = `progress_${url.hostname}${url.pathname}${url.hash}`;
 
-  // Add event listeners
   batchSizeInput.addEventListener("change", saveSettings);
   includeFoldersInput.addEventListener("change", saveSettings);
   nextBtn.addEventListener("click", () => handleAction("DOWNLOAD_BATCH"));
@@ -82,7 +76,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   await updateStatus();
 });
 
-// Generic handler for download actions
 const handleAction = async (action) => {
   disableButtons(true);
   statusDiv.textContent = "Processing...";
@@ -115,7 +108,6 @@ const handleAction = async (action) => {
   }
 };
 
-// Handler for the reset button
 const handleReset = async () => {
   if (
     confirm(
@@ -135,34 +127,90 @@ const handleReset = async () => {
  */
 async function contentScript(config) {
   const { batchSize, includeFolders, folderKey, action } = config;
-  const BATCH_DELAY_MS = 6000; // Increased delay to ensure download starts
 
-  const delay = (ms) => new Promise((res) => setTimeout(res, ms));
+  const createOverlay = () => {
+    const overlayId = "ffm-downloader-overlay";
+    if (document.getElementById(overlayId)) return;
+
+    const overlay = document.createElement("div");
+    overlay.id = overlayId;
+    overlay.style.cssText = `
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background-color: rgba(0, 0, 0, 0.75); z-index: 99999999;
+            display: flex; justify-content: center; align-items: center;
+            color: white; font-size: 24px; font-family: Arial, sans-serif;
+        `;
+    overlay.innerHTML = `
+            <div style="text-align: center; padding: 20px; background: rgba(0,0,0,0.5); border-radius: 10px;">
+                <p>Automatic download in progress...</p>
+                <p style="font-size: 16px;">Please keep this tab open.</p>
+                <p id="ffm-overlay-status" style="font-size: 18px; margin-top: 20px;"></p>
+            </div>
+        `;
+    document.body.appendChild(overlay);
+  };
+
+  const removeOverlay = () => {
+    document.getElementById("ffm-downloader-overlay")?.remove();
+  };
+
+  const updateOverlayStatus = (text) => {
+    const statusEl = document.getElementById("ffm-overlay-status");
+    if (statusEl) statusEl.textContent = text;
+  };
 
   const getItems = async (isInitialScan = false) => {
     let allItems = Array.from(
       document.querySelectorAll("div.main_content div.item.item-selectable")
     );
-
     if (!includeFolders) {
       allItems = allItems.filter((item) => !item.classList.contains("upload"));
     }
-
     const data = await browser.storage.local.get(folderKey);
     const progress = data[folderKey] || { processedIds: [], totalFiles: 0 };
     const processedIds = new Set(progress.processedIds);
-
     const unprocessedItems = allItems.filter(
       (item) => !processedIds.has(item.id)
     );
-
     if (isInitialScan && progress.totalFiles !== allItems.length) {
       progress.totalFiles = allItems.length;
       await browser.storage.local.set({ [folderKey]: progress });
     }
-
     return { unprocessedItems, processedIds, totalFiles: allItems.length };
   };
+
+  const waitForDeselection = () =>
+    new Promise((resolve, reject) => {
+      const downloadButton = document.getElementById(
+        "filebrowser_top_action__multi_download"
+      );
+      if (!downloadButton)
+        return reject(new Error("Download button not found!"));
+
+      // If the button is already hidden, we're good to go.
+      if (downloadButton.style.display === "none") return resolve();
+
+      const observer = new MutationObserver(() => {
+        if (downloadButton.style.display === "none") {
+          observer.disconnect();
+          clearTimeout(fallback);
+          resolve();
+        }
+      });
+
+      const fallback = setTimeout(() => {
+        observer.disconnect();
+        console.warn(
+          "[Files.fm Downloader] Waited for deselection, but button did not hide. Proceeding anyway."
+        );
+        resolve();
+      }, 5000); // 5-second safety timeout
+
+      observer.observe(downloadButton, {
+        attributes: true,
+        attributeFilter: ["style"],
+      });
+    });
 
   const processBatch = async (batch) => {
     if (batch.length === 0) return false;
@@ -170,10 +218,7 @@ async function contentScript(config) {
     console.log(
       `[Files.fm Downloader] Selecting batch of ${batch.length} items.`
     );
-    batch.forEach((item) => {
-      const checkbox = item.querySelector("input.item_selector");
-      if (checkbox) checkbox.click();
-    });
+    batch.forEach((item) => item.querySelector("input.item_selector")?.click());
 
     await new Promise((resolve, reject) => {
       const downloadButton = document.getElementById(
@@ -181,7 +226,6 @@ async function contentScript(config) {
       );
       if (!downloadButton)
         return reject(new Error("Download button not found!"));
-
       const observer = new MutationObserver(() => {
         if (downloadButton.style.display !== "none") {
           observer.disconnect();
@@ -192,86 +236,60 @@ async function contentScript(config) {
       });
       const fallback = setTimeout(() => {
         observer.disconnect();
-        if (downloadButton.style.display !== "none") {
-          downloadButton.click();
-          resolve();
-        } else {
-          reject(new Error("Download button did not appear."));
-        }
+        if (downloadButton.style.display !== "none") downloadButton.click();
+        resolve();
       }, 4000);
-
       observer.observe(downloadButton, {
         attributes: true,
         attributeFilter: ["style"],
       });
     });
 
-    // **BUG FIX**: Wait and then deselect the items to prepare for the next batch.
-    await delay(2000); // Wait 2 seconds for download to initiate and UI to update.
-    console.log(`[Files.fm Downloader] Deselecting ${batch.length} items.`);
     const masterDeselect = document.querySelector(
       "#filebrowser_top_action__multi_select_deselect"
     );
-    if (masterDeselect && masterDeselect.checked) {
-      masterDeselect.click(); // This is the most efficient way to deselect all.
-    } else {
-      // Fallback: deselect one by one if the master checkbox fails
-      batch.forEach((item) => {
-        const checkbox = item.querySelector("input.item_selector");
-        if (checkbox && checkbox.checked) checkbox.click();
-      });
-    }
+    if (masterDeselect?.checked) masterDeselect.click();
 
-    // Update storage with the processed items
-    const { processedIds } = await getItems();
+    // **THE KEY SPEED IMPROVEMENT**: Wait for the UI to confirm deselection.
+    await waitForDeselection();
+
+    const { processedIds, totalFiles } = await getItems();
     batch.forEach((item) => processedIds.add(item.id));
-    const currentData = await browser.storage.local.get(folderKey);
-    const progress = currentData[folderKey] || {};
-    progress.processedIds = Array.from(processedIds);
+    const progress = { processedIds: Array.from(processedIds), totalFiles };
     await browser.storage.local.set({ [folderKey]: progress });
 
+    updateOverlayStatus(
+      `Processed ${progress.processedIds.length} of ${totalFiles} files.`
+    );
     return true;
   };
 
   // --- Main Actions ---
-  if (action === "DOWNLOAD_BATCH") {
-    const { unprocessedItems } = await getItems(true);
-    if (unprocessedItems.length === 0) {
-      alert("All files for this folder have been processed!");
-      return;
-    }
-    const batchToProcess = unprocessedItems.slice(0, batchSize);
-    await processBatch(batchToProcess);
-  } else if (action === "DOWNLOAD_ALL") {
-    alert(
-      "Starting automatic download of all remaining files. Please keep this tab open."
-    );
-
-    while (true) {
+  try {
+    if (action === "DOWNLOAD_BATCH") {
       const { unprocessedItems } = await getItems(true);
       if (unprocessedItems.length === 0) {
-        alert("Automatic download complete! All files have been processed.");
-        break;
+        alert("All files for this folder have been processed!");
+        return;
       }
-
-      const batchToProcess = unprocessedItems.slice(0, batchSize);
-      const success = await processBatch(batchToProcess);
-
-      if (!success) break;
-
-      // Check if we are done before waiting
-      const { unprocessedItems: remainingItems } = await getItems();
-      if (remainingItems.length === 0) {
-        alert("Automatic download complete! All files have been processed.");
-        break;
+      await processBatch(unprocessedItems.slice(0, batchSize));
+    } else if (action === "DOWNLOAD_ALL") {
+      createOverlay();
+      while (true) {
+        const { unprocessedItems } = await getItems(true);
+        if (unprocessedItems.length === 0) {
+          alert("Automatic download complete! All files have been processed.");
+          break;
+        }
+        await processBatch(unprocessedItems.slice(0, batchSize));
       }
-
-      console.log(
-        `[Files.fm Downloader] Batch finished. Waiting ${
-          BATCH_DELAY_MS / 1000
-        } seconds...`
-      );
-      await delay(BATCH_DELAY_MS);
     }
+  } catch (error) {
+    console.error("[Files.fm Downloader] An error occurred:", error);
+    alert(
+      "An error occurred during the download process. Please check the browser console for details."
+    );
+  } finally {
+    removeOverlay();
   }
 }

@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Files.fm Downloader",
+  "version": "1.0.1",
+  "description": "Selects and downloads a specified number of files from a files.fm directory page.",
+  "icons": {
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "permissions": ["activeTab", "scripting", "storage"],
+  "host_permissions": ["*://*.files.fm/*"],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "filesfm-downloader@your-domain.com"
+    }
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "48": "icons/icon-48.png"
+    }
+  }
+}

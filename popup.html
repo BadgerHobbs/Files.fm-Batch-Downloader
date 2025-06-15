@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Files.fm Downloader</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            width: 280px;
+            padding: 15px;
+            background-color: #2b2b2b;
+            color: #dcdcdc;
+        }
+
+        h3 {
+            margin-top: 0;
+            color: #8ab4f8;
+            text-align: center;
+        }
+
+        .section {
+            background-color: #3c3c3c;
+            border: 1px solid #555;
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 15px;
+        }
+
+        .section-title {
+            font-weight: bold;
+            font-size: 1.1em;
+            margin-top: 0;
+            margin-bottom: 10px;
+            color: #e0e0e0;
+        }
+
+        .form-group {
+            margin-bottom: 12px;
+        }
+
+        label {
+            display: inline-block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #e0e0e0;
+        }
+
+        input[type="number"] {
+            width: 60px;
+            padding: 5px;
+            margin-left: 10px;
+            background-color: #454545;
+            color: #dcdcdc;
+            border: 1px solid #666;
+            border-radius: 3px;
+        }
+
+        input[type="checkbox"] {
+            vertical-align: middle;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            font-size: 14px;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-top: 5px;
+        }
+
+        .primary-btn {
+            background-color: #0d6efd;
+        }
+
+        .primary-btn:hover {
+            background-color: #0b5ed7;
+        }
+
+        .secondary-btn {
+            background-color: #6c757d;
+        }
+
+        .secondary-btn:hover {
+            background-color: #5a6268;
+        }
+
+        .danger-btn {
+            background-color: #dc3545;
+            font-size: 12px;
+            padding: 6px;
+        }
+
+        .danger-btn:hover {
+            background-color: #c82333;
+        }
+
+        button:disabled {
+            background-color: #5a6268;
+            color: #aaa;
+            cursor: not-allowed;
+        }
+
+        #status {
+            margin-top: 10px;
+            font-style: italic;
+            color: #aaa;
+            text-align: center;
+            font-size: 13px;
+            line-height: 1.4;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+
+<body>
+    <h3>Files.fm Downloader</h3>
+
+    <div class="section">
+        <h4 class="section-title">Batch Download Controls</h4>
+        <div class="form-group">
+            <label for="batch-size">Batch Size:</label>
+            <input type="number" id="batch-size" min="1" value="5">
+        </div>
+        <div class="form-group">
+            <input type="checkbox" id="include-folders">
+            <label for="include-folders" style="font-weight:normal;">Include folders</label>
+        </div>
+        <button id="download-next-btn" class="primary-btn">Download Next Batch</button>
+        <button id="download-all-btn" class="secondary-btn">Download All in Batches</button>
+    </div>
+
+    <div id="status">Loading progress...</div>
+    <button id="reset-progress-btn" class="danger-btn">Reset Progress for This Folder</button>
+
+    <script src="popup.js"></script>
+</body>
+
+</html>

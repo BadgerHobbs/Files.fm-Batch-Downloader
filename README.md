@@ -2,6 +2,8 @@
 
 This Firefox Web Extension enhances the user experience on files.fm by providing tools for batch downloading files and folders, with progress tracking to manage large directories.
 
+![image](https://github.com/user-attachments/assets/083e7987-93ba-4f60-a19e-e26e30b183b9)
+
 ## Features
 
 - **Manual Batch Downloads**: Download a specific number of files at a time.
